@@ -46,12 +46,8 @@ class SignalCollector:
             # --- WEATHER ---
             tasks.append(self._get_weather_with_fallback(client, detected_location, sources_live))
 
-            # --- TRAFFIC ---
-            if settings.google_maps_api_key:
-                tasks.append(self._get_live_traffic(client, detected_location))
-                sources_live.append("traffic")
-            else:
-                tasks.append(self._get_mock_signal(client, "traffic", {"area": area_keyword}))
+            # --- TRAFFIC (try live Google Maps, fallback to mock) ---
+            tasks.append(self._get_traffic_with_fallback(client, detected_location, area_keyword, sources_live))
 
             # --- SENSORS (Always Mock/IoT Sim) ---
             tasks.append(self._get_mock_signal(client, "sensors", {"area": area_keyword}))
@@ -134,6 +130,23 @@ class SignalCollector:
                     credibility=0.95, timestamp=datetime.now(timezone.utc), location=loc, metadata=data
                 )
         except: return None
+
+    async def _get_traffic_with_fallback(
+        self,
+        client: httpx.AsyncClient,
+        loc: str,
+        area_keyword: str,
+        sources_live: list[str],
+    ) -> Optional[Signal]:
+        """Try Google Maps live traffic first, then fall back to mock if unavailable."""
+        if settings.google_maps_api_key:
+            live = await self._get_live_traffic(client, loc)
+            if live is not None:
+                sources_live.append("traffic")
+                return live
+
+        # Fallback to mock traffic endpoint
+        return await self._get_mock_signal(client, "traffic", {"area": area_keyword})
 
     async def _get_live_x_signals(self, client: httpx.AsyncClient, query: str) -> list[Signal]:
         # Real X API call
