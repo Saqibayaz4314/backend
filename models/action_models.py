@@ -330,6 +330,10 @@ class AnalyzeResponse(BaseModel):
         default_factory=list,
         description="Detailed execution logs for each agent (for mobile app display)",
     )
+    signal_metadata: dict = Field(
+        default_factory=dict,
+        description="Metadata about signal collection (which sources succeeded/failed)",
+    )
 
     @field_validator("incident_id")
     @classmethod
