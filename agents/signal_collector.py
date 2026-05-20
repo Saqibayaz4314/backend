@@ -44,11 +44,7 @@ class SignalCollector:
             tasks = []
             
             # --- WEATHER ---
-            if settings.openweather_api_key:
-                tasks.append(self._get_live_weather(client, detected_location))
-                sources_live.append("weather")
-            else:
-                tasks.append(self._get_mock_signal(client, "weather", {"city": detected_location}))
+            tasks.append(self._get_weather_with_fallback(client, detected_location, sources_live))
 
             # --- TRAFFIC ---
             if settings.google_maps_api_key:
@@ -109,6 +105,21 @@ class SignalCollector:
                     credibility=0.98, timestamp=datetime.now(timezone.utc), location=loc, metadata=data
                 )
         except: return None
+
+    async def _get_weather_with_fallback(
+        self,
+        client: httpx.AsyncClient,
+        loc: str,
+        sources_live: list[str],
+    ) -> Optional[Signal]:
+        """Try OpenWeather first, then fall back to mock weather if needed."""
+        if settings.openweather_api_key:
+            live_signal = await self._get_live_weather(client, loc)
+            if live_signal is not None:
+                sources_live.append("weather")
+                return live_signal
+
+        return await self._get_mock_signal(client, "weather", {"city": loc})
 
     async def _get_live_traffic(self, client: httpx.AsyncClient, loc: str) -> Optional[Signal]:
         # Simple distance matrix check as proxy for traffic
